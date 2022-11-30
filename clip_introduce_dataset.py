@@ -9,6 +9,7 @@ from PIL import Image
 from os import listdir
 from os.path import isfile, join
 from transformers import ViltProcessor
+from transformers import CLIPProcessor, CLIPVisionModel
 
 def id_from_filename(filename: str) ->Optional[int]:
     match = filename_re.fullmatch(filename)
@@ -87,6 +88,7 @@ class VQADataset(torch.utils.data.Dataset):
         self.annotations = annotations
         self.processor = ViltProcessor.from_pretrained("dandelin/vilt-b32-mlm")
         self.len = len(config.id2label)
+        self.vision_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32", hidden_size = 768)
 
     def __len__(self):
         return len(self.annotations)
@@ -103,6 +105,9 @@ class VQADataset(torch.utils.data.Dataset):
             text = questions['question']
             
             encoding = self.processor(image, text, padding="max_length", truncation=True, return_tensors="pt")
+            clip_embedding = self.vision_processor(images=image, return_tensors="pt")
+            encoding['pixel_values'] = clip_embedding["pixel_values"]
+            #clipのprocessorのreturnはpixel_valueしかないのでここのみ変更
             # remove batch dimension
             for k,v in encoding.items():
                 encoding[k] = v.squeeze()

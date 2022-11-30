@@ -30,9 +30,9 @@ def train(model,trainloader):
         print(f"Epoch: {epoch}")
         for batch in tqdm(trainloader):
             count += 1
-            if batch == False:
-                print("skip {} batch".format(count))
-                continue
+            # if batch == False:
+            #     print("skip {} batch".format(count))
+            #     continue
             # get the inputs; 
             batch = {k:v.to(device) for k,v in batch.items()}
 
@@ -57,6 +57,10 @@ def val(model,valloader):
     train_running_loss = 0
     train_total = 0
     for batch in tqdm(valloader):
+            count = 0
+            if batch == False:
+                print("skip {} batch".format(count))
+                continue
             batch = {k:v.to(device) for k,v in batch.items()}
             outputs = model(**batch)
             logits = outputs.logits #各クラスへの確率
@@ -78,8 +82,8 @@ def val(model,valloader):
 if __name__ == '__main__':
     #load config
     config = ViltConfig()
-    # wandb.init(project="vilt")
-    # wandb.config = {"learning_rate": 5e-5,  "epochs": 50, "batch_size": 32 }
+    wandb.init(project="vilt")
+    wandb.config = {"learning_rate": 5e-5,  "epochs": 50, "batch_size": 32 }
     #load train data
     train_quenstion = 'Dataset/questions/v2_OpenEnded_mscoco_train2014_questions.json'
     train_annotation = 'Dataset/annotations/v2_mscoco_train2014_annotations.json'
