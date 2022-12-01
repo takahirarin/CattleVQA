@@ -14,7 +14,7 @@ class Attention(nn.Module):
         # (実質、[1, d_k]*[d_k,1] = [1,1]となっている)
 
         if attention_mask is not None:
-            scores = scores.masked_fill(attention_mask == 0, float('-inf'))
+            scores = scores.masked_fill(attention_mask == 0, 0)
             #0のところを∞に置き換えてマスクする？
 
         attn = scores.softmax(dim=-1)
@@ -60,7 +60,7 @@ class MultiHeadAttention(nn.Module):
 class FFN(nn.Module):
     def __init__(self,config):
         super(FFN,self).__init__()
-        self.dense  = nn.Linear(config.hidden_size,config.intermidiate_size)
+        self.dense  = nn.Linear(config.hidden_size,config.intermediate_size)
         self.activation = config.hidden_act
 
     def forward(self, hidden_states):
@@ -73,7 +73,7 @@ class FFN(nn.Module):
 class SubLayerConnection(nn.Module):
     def __init__(self,config):
         super(SubLayerConnection,self).__init__()
-        self.dense = nn.Linear(config.intermidate_size, config.hidden_size)
+        self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
         self.norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 

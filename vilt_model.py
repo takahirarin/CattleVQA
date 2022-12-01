@@ -93,7 +93,7 @@ class ViltEmbeddings(nn.Module):
 
     def visual_embed(self,pixel_values, pixel_mask, max_image_length=200):
         _, _, ph, pw = self.patch_embeddings.projection.weight.shape
-        print(pixel_values.size)
+        # print(pixel_values.size)
         x = self.patch_embeddings(pixel_values)
         x_mask = pixel_mask[:, None, :, :].float()
         x_mask = nn.functional.interpolate(x_mask, size=(x.shape[2], x.shape[3])).long()
@@ -201,11 +201,6 @@ class ViltEmbeddings(nn.Module):
                 outputs = model(**inputs)
                 last_hidden_state = outputs.last_hidden_state
                 pooled_output = outputs.pooler_output  # pooled CLS states
-
-
-
-
-
             """
             image_embeds, image_masks, patch_index = self.visual_embed(
                 pixel_values , pixel_mask, max_image_length=self.config.max_image_length )
@@ -246,7 +241,8 @@ class ViltLayer(nn.Module):
         self.transformer_block = FFN(config)
         self.shortcut = SubLayerConnection(config)
     def forward(self,hidden_states,attention_mask):
-        attention_output = self.attention(hidden_states)
+        attention_output = self.attention(hidden_states, hidden_states, hidden_states,
+            config.num_attention_heads, config.hidden_size, attention_mask)
         FFN_output = self.transformer_block(attention_output)
         layer_output = self.shortcut(FFN_output, attention_output)
         return layer_output
@@ -273,7 +269,7 @@ if __name__ == "__main__":
     path2 = 'Dataset/annotations/v2_mscoco_val2014_annotations.json'
     questions, annotations = read_data(path1,path2,config)
     processor = ViltProcessor.from_pretrained("dandelin/vilt-b32-mlm")
-    dataset = VQADataset( questions, annotations,config)
+    dataset = VQADataset( questions[:32], annotations[:32],config)
     
     dataloader = DataLoader(dataset, collate_fn=collate_fn,batch_size =config.batch_size,shuffle=True )
     for datas in tqdm(dataloader):
