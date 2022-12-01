@@ -23,8 +23,31 @@ class ViltModel(nn.Module):
         self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.classifier = ViltClassifer(config)
 
+    def get_extended_attention_mask(self, attention_mask, input_shape, device):
+        if attention_mask.dim() == 3:
+            extended_attention_mask = attention_mask[:, None, :, :]
+        elif attention_mask.dim() == 2:
+            extended_attention_mask = attention_mask[:, None, None, :]
+        else:
+            raise ValueError(
+                "Wrong shape for input_ids (shape {}) or attention_mask (shape {})".format(
+                    input_shape, attention_mask.shape
+                )
+            )
+        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+        return extended_attention_mask
+
+
     def forward(self,input_ids, attention_mask, token_type_ids,
                     pixel_values, pixel_mask, image_token_type_idx=1):
+        """
+            input_ids: [batch_size, max_length(max_position_embedding)],
+            attention_mask: [batch_size, max_length(max_position_embedding)],
+            token_type_ids: [batch_size, max_length(max_position_embedding)],
+            pixel_values: [batch_size, RGB_size, x, y](x,yは画像による),
+            pixel_mask: [batch_size, x,y]
+
+        """
         input_shape = input_ids.size()
         # get text info
         text_batch_size, seq_length = input_shape
@@ -41,9 +64,21 @@ class ViltModel(nn.Module):
             input_ids, attention_mask, token_type_ids,
             pixel_values, pixel_mask,image_token_type_idx )
         
+        """
+            embeddings: [batch_size, emb_size, hidden_size]
+            masks: [batch_size, emb_size]   
+        """
+        
         # input embeddings into encoder
         #extended_attention_mask = ModuleUtilsMixin.get_extended_attention_mask(attention_mask, input_shape)
-        encoder_output = self.encoder(embeddings, attention_mask)
+        extended_attention_mask: torch.Tensor = self.get_extended_attention_mask(masks, input_shape, device)
+        encoder_output = self.encoder(embeddings, extended_attention_mask)
+
+        """
+            extended_attention_mask: [batch_size, 1, 1, emb_size]
+            encoder_output: [batch_size, emb_size, hidden_size]
+        """
+
         sequence_output = encoder_output[-1]
         pooled_output = self.pooler(sequence_output)
 
@@ -60,7 +95,7 @@ class ViltClassifer(nn.Module):
         super().__init__()
         self.fc = nn.Linear(config.hidden_size, config.hidden_size*2)
         self.norm = nn.LayerNorm(config.hidden_size*2)
-        self.activation = config.hidden_act
+        self.activation = nn.GELU()
 
     def forward(self,x):
         output = self.fc(x)
@@ -75,10 +110,10 @@ class ViltClassifer(nn.Module):
     
 class ViltEmbeddings(nn.Module):
     def __init__(self,config):
-        #super(ViltEmbeddings).__init__()
         super().__init__()
          # text embeddings
         self.text_embeddings = BERTEmbeddings(config)
+
         # patch embeddings
         self.patch_embeddings = PatchEmbeddings(config)
         self.cls_token = nn.Parameter(torch.zeros(1, 1, config.hidden_size))
@@ -93,7 +128,7 @@ class ViltEmbeddings(nn.Module):
 
     def visual_embed(self,pixel_values, pixel_mask, max_image_length=200):
         _, _, ph, pw = self.patch_embeddings.projection.weight.shape
-        # print(pixel_values.size)
+       
         x = self.patch_embeddings(pixel_values)
         x_mask = pixel_mask[:, None, :, :].float()
         x_mask = nn.functional.interpolate(x_mask, size=(x.shape[2], x.shape[3])).long()
@@ -210,11 +245,18 @@ class ViltEmbeddings(nn.Module):
             #     torch.zeros_like(attention_mask,dtype=torch.long, device = text_embeds.device))
 
             image_embeds = image_embeds + self.token_type_embeddings(
-                torch.full_like(image_masks, image_token_type_idx, dtype=torch.long, device=image_embeds.device))
+                torch.full_like(image_masks, image_token_type_idx, dtype=torch.long, device=image_embeds.device))            
 
             # 4. concat
             embeddings = torch.cat([text_embeds, image_embeds], dim =1)
             masks = torch.cat([attention_mask, image_masks], dim=1)
+
+            """
+                text_embeddings: [batch_size, max_length, hidden_size]
+                patch_embeddings: [batch_size, z(任意), hidden_size]
+                embeddings: [batch_size, emb_size(max_length+z), hidden_size]
+                masks: [batch_size, emb_size]
+            """
             return embeddings, masks
 
 
