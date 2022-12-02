@@ -303,6 +303,9 @@ class ViltPooler(nn.Module):
         pooled_output = self.activation(pooled_output)
         return pooled_output
 
+
+
+
 if __name__ == "__main__":
     config = ViltConfig()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
