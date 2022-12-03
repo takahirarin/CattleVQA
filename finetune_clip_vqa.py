@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 from transformers import ViltProcessor
 from vilt_config import ViltConfig
-from dataset import VQADataset, read_data, collate_fn
+from clip_introduce_dataset import VQADataset, read_data, collate_fn
 from transformers import ViltForQuestionAnswering
 from torch.utils.data import DataLoader
 from tqdm.notebook import tqdm
-from vilt_model import ViltModel
+from vilt_model_clip import ViltModel
 import wandb # 実験結果の可視化ツール
 
 
@@ -43,7 +43,7 @@ def load_set_split(question,annotation,config):# データセット分割用のl
 def train(model,trainloader):
     optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
     model.train()
-    for epoch in range(150):  # loop over the dataset multiple times
+    for epoch in range(3):  # loop over the dataset multiple times
         print(f"Epoch: {epoch}")
         for batch in tqdm(trainloader):
             # if batch == False:
@@ -51,7 +51,6 @@ def train(model,trainloader):
             #     continue
             # get the inputs; 
             batch = {k:v.to(device) for k,v in batch.items()}
-           
 
             # zero the parameter gradients
             optimizer.zero_grad()
@@ -62,8 +61,8 @@ def train(model,trainloader):
             print("Loss:", loss.item())
             loss.backward()
             optimizer.step()
-            wandb.log({"loss": loss})
-            wandb.watch(model)
+            # wandb.log({"loss": loss})
+            # wandb.watch(model)
         
     model.save_pretrained('weights/vilt_finetune')
 
@@ -108,6 +107,7 @@ if __name__ == '__main__':
     val_annotation = 'Dataset/annotations/v2_mscoco_val2014_annotations.json'
 
     train_dataloader, val_dataloader = load_set_split(val_question, val_annotation, config)
+    #train_dataloader = load_set(val_question, val_annotation, config)
     
     # load model 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -117,7 +117,7 @@ if __name__ == '__main__':
                                                 #  num_labels=len(config.id2label),
                                                 #  id2label=config.id2label,
                                                 #  label2id=config.label2id)
-    model = ViltForQuestionAnswering.from_pretrained('weights/vilt_finetune')                         
+    #model = ViltForQuestionAnswering.from_pretrained('weights/vilt_finetune')                         
     #print(model)
     model.to(device)
     train(model,train_dataloader)
